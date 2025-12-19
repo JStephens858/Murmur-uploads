@@ -5,6 +5,10 @@ import cors from '@fastify/cors';
 import { Server } from "@tus/server";
 import { FileStore } from "@tus/file-store";
 
+// Max upload speed in bytes per second (e.g., 1048576 = 1 MB/s, 524288 = 512 KB/s)
+// Set to null or 0 to disable throttling
+const MAX_UPLOAD_SPEED = 1048576; // 1 MB/s default
+
 const app = fastify({ 
 	logger: true,
 	trustProxy: true,
@@ -47,6 +51,15 @@ const tusServer = new Server({
 		console.log(`generating: https://${host}${path}/${id}`);
     return `https://${host}${path}/${id}`;
   },
+	onIncomingRequest: (req, res) => {
+		// Apply upload speed throttling if configured
+		if (MAX_UPLOAD_SPEED && MAX_UPLOAD_SPEED > 0) {
+			const throttle = new Throttle({ rate: MAX_UPLOAD_SPEED });
+			req.pipe(throttle);
+			return throttle;
+		}
+		return req;
+	},
 	/*
 	onUploadCreate: async (req, res, upload) => {
     console.log('=== DEBUGGING TUS UPLOAD CREATE ===');
