@@ -69,12 +69,10 @@ subscribeRedisClient.on('error', err => {
 const murm = new MurmurAPI(murmurDbConfig);
 
 async function getFinishedUpload() {
-//	console.log(process.env.HOSTNAME_FOR_UPLOADS);
 	await murm.query("update uploadingFiles set serverHandlingProcessing=?,serverClaimedDate=now() where uploadServer = ? and serverHandlingProcessing is null order by createdDate limit 1",[process.env.HOSTNAME_FOR_UPLOADS, process.env.HOSTNAME_FOR_UPLOADS]);
 	var [rows] = await murm.query("select * from uploadingFiles where serverHandlingProcessing=? and completedDate is null",[process.env.HOSTNAME_FOR_UPLOADS]);
-//	console.log(rows.length);
-//	process.exit()
 
+	/*
 	if (rows.length > 1){
 		try{
 			await murm.query("insert into serverErrors (hostname,eventId,method,args,username,name,message,extensions,stack) values(?,?,?,?,?,?,?,?,?)",[process.env.HOSTNAME_FOR_UPLOADS, "0", "getFinishedUpload", "{}", "uploads", "Too Many", "Got more than 1 file ready", "", ""]);
@@ -82,13 +80,12 @@ async function getFinishedUpload() {
 			console.log(err);
 		};
 	}
+	*/
 	return rows;
 }
 
 async function attemptProcessing(){
-//	console.log("attempt processing");
 	var finishedUploads = await getFinishedUpload();
-//	console.log(finishedUploads.length + " finishedUploads");
 	while (finishedUploads.length > 0){
 		for (var upload of finishedUploads){
 			await processUpload(upload);
@@ -223,7 +220,6 @@ async function preprocessVideoUpload({upload, localFile}){
 				}
 			}
 		}
-		console.log(upload.width + " " + upload.height + " " + upload.duration + " " + timestamp);
 		var parts = upload.fileKey.split('.');
 		if (parts.length > 1){
 			parts.splice(-1, 1);
@@ -290,10 +286,6 @@ async function processUpload(upload){
 		}
 
 
-		console.log(upload);
-//		process.exit();
-
-//		var uuid = uuidv7();
 		var ext = upload.fileKey.split('.').pop().toLowerCase();
 		if (originalFilename){
 			originalFilename.split('.').pop().toLowerCase();
@@ -309,17 +301,13 @@ async function processUpload(upload){
 		if (originalFilename){
 			commandParams.ContentDisposition = contentDisposition;
 		}
-		console.log(commandParams);
-		//process.exit();
 		const command = new PutObjectCommand(commandParams);
-		//console.log(command);
 		var presignedPUTURL = null;
 		try {
 			presignedPUTURL = await getSignedUrl(s3Client, command, { expiresIn: 600000 });
 		}catch(err) {
 			console.log(err);
 		}
-		console.log("presignedPUTURL " + presignedPUTURL);
 		var needleParams = { json: true, headers:{'Content-type': upload.contentType, 'Content-Length': stats.size}};
 		if (originalFilename){
 			needleParams.headers["Content-Disposition"] = contentDisposition;
@@ -338,18 +326,7 @@ async function processUpload(upload){
 				"width":upload.width,
 				"height":upload.height,
 			});
-			console.log({
-				"bucketName":bucket,
-				"fileKey":upload.fileKey,
-				"size":upload.size,
-				"previewImageFileKey":upload.previewImageFileKey,
-				"generatedPreviewUrl":upload.mediaPreviewImageUrl,
-				"duration":upload.duration,
-				"width":upload.width,
-				"height":upload.height,
-			});
 		}
-		//console.log(result);
 	} catch (err) {
 		console.log(err);
 		var username = "unknown";
@@ -391,7 +368,6 @@ async function processUpload(upload){
 
 	console.log("start");
 	while (1){
-	//	console.log("idle");
 		await attemptProcessing();
 		await delay(30000); 
 	}

@@ -71,8 +71,8 @@ publishRedisClient.on('error', err => {
 const MAX_UPLOAD_SPEED = 1048576; // 1 MB/s default
 
 const app = fastify({ 
-	//logger: {level: 'error'},
-	logger: true,
+	logger: {level: 'warn'},
+	//logger: true,
 	trustProxy: true,
 	https: {
 		key: fs.readFileSync('/etc/letsencrypt/live/up01.murmurmd.com/privkey.pem'),
@@ -155,8 +155,9 @@ const tusServer = new Server({
   },
 
   // 3. onUploadFinish - Runs AFTER upload completes
-  async onUploadFinish(req, res, upload) {
-    console.log(`Upload finished: ${upload}`);
+  async onUploadFinish(req, upload) {
+	//This is same as the other function
+//    console.log("Upload finished:", upload);
 
     // Do post-processing: move file, trigger webhook, etc.
     // Example: notify your app that upload is done
@@ -182,7 +183,7 @@ tusServer.on(EVENTS.POST_CREATE, (req, res, upload) => {
 });
 
 tusServer.on(EVENTS.POST_RECEIVE, (req, res, upload) => {
-  console.log('---- Chunk received for:', upload);
+//  console.log('---- Chunk received for:', upload);
 });
 
 tusServer.on(EVENTS.POST_FINISH, async(req, res, upload) => {
