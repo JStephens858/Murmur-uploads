@@ -68,7 +68,7 @@ publishRedisClient.on('error', err => {
 
 // Max upload speed in bytes per second (e.g., 1048576 = 1 MB/s, 524288 = 512 KB/s)
 // Set to null or 0 to disable throttling
-const MAX_UPLOAD_SPEED = 1048576; // 1 MB/s default
+const MAX_UPLOAD_SPEED = null;//1048576; // 1 MB/s default
 
 const app = fastify({ 
 	logger: {level: 'warn'},
@@ -274,6 +274,7 @@ async function fireHealthCheckToAPI({service, hostname}){
                 })
 		return result?.data?.healthCheck?.success;
         }catch (e){
+                console.log("Error time: " + new Date());
                 console.log(e);
         }
 }
