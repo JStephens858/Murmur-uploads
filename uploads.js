@@ -4,6 +4,8 @@ import fastify from "fastify";
 import { Throttle } from 'stream-throttle';
 import fs from 'fs';
 import cors from '@fastify/cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Server } from "@tus/server";
 import { FileStore } from "@tus/file-store";
 import {EVENTS, ERRORS, REQUEST_METHODS, TUS_RESUMABLE, HEADERS} from '@tus/utils'
@@ -104,6 +106,8 @@ await app.register(cors, {
   ]
 });
 
+
+
 const tusServer = new Server({
 	path: "/files",
 	datastore: new FileStore({ directory: "./files" }),
@@ -118,12 +122,17 @@ const tusServer = new Server({
   // 1. onIncomingRequest - Runs BEFORE all handlers (access control, auth)
   async onIncomingRequest(req, uploadId) {
     // Access control / authentication
-	  /*
-    const token = req.headers.authorization;
-    if (!token) {
-      throw { status_code: 401, body: 'Unauthorized' };
-    }
-*/
+	  
+	  console.log("onIncomingRequest");
+	  console.log(req);
+	  const params = req.url.split("?");
+	  console.log(req.url + " " + req.params);
+	  
+//    const token = req.headers.authorization;
+//    if (!token) {
+//      throw { status_code: 401, body: 'Unauthorized' };
+//    }
+
     // You can verify JWT, check permissions, etc.
     console.log(`Request for upload: ${uploadId}`);
   },
@@ -279,10 +288,42 @@ async function fireHealthCheckToAPI({service, hostname}){
         }
 }
 
+async function checkForUnprocessedFiles(){
+	const __dirname = path.dirname(fileURLToPath(import.meta.url));
+	const filesDir = path.join(__dirname, 'files');
+	const entries = await fs.promises.readdir(filesDir);
+	const jsonFiles = entries.filter(name => name.endsWith('.json'));
+	const results = await Promise.all(
+		jsonFiles.map(async name => {
+			const contents = await fs.promises.readFile(path.join(filesDir, name), 'utf8');
+			const parsed = JSON.parse(contents);
+			const companion = path.join(filesDir, name.slice(0, -'.json'.length));
+			const stat = await fs.promises.stat(companion);
+			parsed.currentFileSize = stat.size;
+			return parsed;
+		})
+	);
+
+	for (var result of results){
+		var [uploadRows] = await murm.query("select * from uploadingFiles where fileKey=?",[result.metadata.fileKey]);
+		if (uploadRows.length > 0){
+			if (!uploadRows[0].uploadServer){
+				console.log(`${uploadRows[0].uploadServer} supposed fileSize: ${uploadRows[0].size} on disk: ${result.currentFileSize}`);
+				if (uploadRows[0].size == result.currentFileSize){
+					await murm.query("update uploadingFiles set uploadServer=?,uploadId=? where fileKey=?",[process.env.HOSTNAME_FOR_UPLOADS, result.id,result.metadata.fileKey]);
+					await publishRedisClient.publish('redis_UPLOAD_FINISHED',JSON.stringify(result));
+				}
+			}
+		}
+		
+	}
+}
+
 let port = process.env.UPLOADS_SERVICE_PORT;
 (async() => {
 
 	await publishRedisClient.connect();
+	await checkForUnprocessedFiles();
 	try {
 		await app.listen({ host:"0.0.0.0", port });
 		console.log(`Server listening on port ${port}`);

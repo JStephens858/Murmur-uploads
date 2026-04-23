@@ -352,25 +352,29 @@ async function processUpload(upload){
 
 (async() => {
 
+	try {
+		await subscribeRedisClient.connect();
 
-	await subscribeRedisClient.connect();
+		await subscribeRedisClient.subscribe('redis_UPLOAD_FINISHED', async(message, channel) => {
+			var obj = null;
+			try {
+				obj = JSON.parse(message);
+				console.log(obj);
+			}catch (e){
+				console.log(e);
+			}
+			await attemptProcessing();
+		});
 
-	await subscribeRedisClient.subscribe('redis_UPLOAD_FINISHED', async(message, channel) => {
-		var obj = null;
-		try {
-			obj = JSON.parse(message);
-			console.log(obj);
-		}catch (e){
-			console.log(e);
+		console.log("start");
+		while (1){
+			await attemptProcessing();
+			await delay(30000); 
 		}
-		await attemptProcessing();
-	});
-
-	console.log("start");
-	while (1){
-		await attemptProcessing();
-		await delay(30000); 
-	}
+	}catch (e){
+                console.log("Error time: " + new Date());
+                console.log(e);
+        }
 })();
 
 async function fireFileCompletedRequest({bucketName,fileKey,size,previewImageFileKey,generatedPreviewUrl,duration, width, height}){
